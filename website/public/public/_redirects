@@ -1,0 +1,11 @@
+/docs/* https://docs.rome.tools/:splat
+/blog/2022/11/08/rome-10.html /blog/2022/11/08/rome-10
+/blog/2022/04/05/rome-formatter-release.html /blog/2022/04/05/rome-formatter-release
+/blog/2022/02/08/rome-formatter-and-rust-update.html /blog/2022/02/08/rome-formatter-and-rust-update
+/blog/2021/09/21/rome-will-be-rewritten-in-rust.html /blog/2021/09/21/rome-will-be-rewritten-in-rust
+/blog/2021/05/04/announcing-rome-tools-inc.html /blog/2021/05/04/announcing-rome-tools-inc
+/blog/2020/08/08/introducing-rome.html /blog/2020/08/08/introducing-rome
+
+# URLs used in the CLI `init` command.
+/editors https://docs.rome.tools/guides/getting-started#editor-setup
+/configuration https://docs.rome.tools/configuration

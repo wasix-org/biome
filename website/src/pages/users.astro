@@ -1,0 +1,36 @@
+---
+import Page from "../layouts/Page.astro";
+import "../styles/users.scss";
+import rawUsers from "../users.json";
+
+const pinnedUsers = rawUsers.filter(user => user.pinned === true);
+const unpinnedUsers = rawUsers.filter(user => user.pinned !== true);
+
+interface User {
+  name: string;
+  url: string;
+  logo: string | {
+    light: string;
+    dark: string;
+  };
+}
+
+const users: User[] = [...pinnedUsers, ...unpinnedUsers];
+---
+
+<Page title="Who's Using Rome" bodyClass="users-body">
+  <h1>See Who's Using Rome</h1>
+  <p>Logos are submitted by company and project representatives. These companies may or may not be using Rome on their main web properties, but they are definitely using it somewhere in their organizations!</p>
+
+  <ul class="company-list">
+    {users.map((user) => {
+      return <li><a href={user.url}>
+        {typeof user.logo === "string" && <img src={user.logo} alt={user.name}>}
+        {typeof user.logo !== "string" && typeof user.logo.light === "string" && <img class="light" src={user.logo.light} alt={user.name}>}
+        {typeof user.logo !== "string" && typeof user.logo.dark === "string" && <img class="light" src={user.logo.dark} alt={user.name}>}
+      </a></li>;
+    })}
+  </ul>
+
+  <p>Page inspired by <a href="https://babeljs.io/users">Babel</a> and <a href="https://emberjs.com/ember-users/">Ember</a>.</p>
+</Page>

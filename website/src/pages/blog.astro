@@ -1,0 +1,24 @@
+---
+import Page from "../layouts/Page.astro";
+import InlineSVG from "../components/InlineSVG.astro";
+import BlogPostInfo from "../components/BlogPostInfo.astro";
+
+let posts = await Astro.glob("./blog/**/*.mdx");
+posts = posts.sort((a, b) => {
+	return new Date(b.frontmatter.pubDate).valueOf() - new Date(a.frontmatter.pubDate).valueOf();
+});
+---
+
+<Page title="Blog">
+	<div class="blog">
+		<h1>Blog <a href="/feed.xml" class="rss-icon"><InlineSVG src="rss" /><span class="sr-only">RSS</span></a></h1>
+		
+		<section class="blog"></section>
+		{posts.map((post) => <article>
+			<h2><a href={post.url}>{post.frontmatter.title}</a></h2>
+			<BlogPostInfo frontmatter={post.frontmatter} />
+			<Fragment set:html={post.frontmatter.summary} />
+			<p><a href={post.url}>Read more</a></p>
+		</article>)}
+	</div>
+</Page>

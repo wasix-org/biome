@@ -1,0 +1,77 @@
+---
+import ActiveLink from "../components/ActiveLink.astro";
+import InlineSVG from "../components/InlineSVG.astro";
+import Base from "./Base.astro";
+---
+
+<Base {...Astro.props}>
+	<div class="page-header">
+		<div class="container ">
+			<a class="logo" href="/">
+				<InlineSVG src="rome-logo" />
+				<span class="logo-text sr-only">Rome</span>
+			</a>
+
+			<ul class="middle">
+				<li><a href="/docs/">Docs</a></li>
+				<li><a href="https://biomejs.dev/playground">Playground</a></li>
+				<li><ActiveLink href="/blog/">Blog</ActiveLink></li>
+			</ul>
+
+			<ul class="right">
+				<li class="foreground-svg">
+					<a target="_blank" href="https://discord.gg/rome">
+						<InlineSVG src="discord" />
+						<span class="sr-only">Discord</span>
+					</a>
+				</li>
+
+				<li class="foreground-svg">
+					<a target="_blank" href="https://github.com/rome/tools">
+						<InlineSVG src="github" />
+						<span class="sr-only">GitHub</span>
+					</a>
+				</li>
+
+				<li class="foreground-svg">
+					<a target="_blank" href="https://twitter.com/rometools">
+						<InlineSVG src="twitter" />
+						<span class="sr-only">Twitter</span>
+					</a>
+				</li>
+			</ul>
+		</div>
+	</div>
+
+	<div class="page-header-mobile">
+		<a class="logo" href="/">
+			<InlineSVG src="rome-logo" />
+			<span class="logo-text sr-only">Rome</span>
+		</a>
+		<div class="stretch"></div>
+
+		<a href="#" class="mobile-handle">
+			<InlineSVG src="mobile-nav-handle" />
+			<InlineSVG src="close-icon" />
+		</a>
+	</div>
+
+	<slot />
+
+	<div class="container">
+		<footer aria-labelledby="footer" class="footer-inner">
+				<h1 id="footer" class="sr-only">Footer</h1>
+
+				<p>&copy; 2022 Rome Tools. All rights reserved.</p>
+
+				<div class="color-scheme-switch-container">
+					<button aria-label="Toggle theme" title="Toggle theme" role="switch" aria-checked="true" class="color-scheme-switch">
+						<div class="selector"></div>
+						<InlineSVG src="moon" />
+						<InlineSVG src="sun" />
+					</button>
+				</div>
+			</div>
+		</footer>
+	</div>
+</Base>

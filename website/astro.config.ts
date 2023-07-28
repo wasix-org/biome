@@ -145,13 +145,13 @@ function inlineIntegration(): AstroIntegration {
 function remarkDefaultLayoutPlugin() {
 	return (tree, file) => {
 		const { frontmatter } = file.data.astro;
-		frontmatter.layout = frontmatter.layout ?? "@src/layouts/Layout.astro";
+		frontmatter.layout = frontmatter.layout ?? "@src/layouts/DocsLayout.astro";
 	};
 }
 
 // https://astro.build/config
 export default defineConfig({
-	site: "https://rome.tools",
+	site: "https://biomejs.dev",
 	output: "static",
 	outDir: "build",
 
