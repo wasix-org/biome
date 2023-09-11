@@ -4,10 +4,8 @@ use crate::execute::diagnostics::{
     CIFormatDiffDiagnostic, CIOrganizeImportsDiffDiagnostic, ContentDiffAdvice,
     FormatDiffDiagnostic, OrganizeImportsDiffDiagnostic, PanicDiagnostic,
 };
-use crate::{
-    CliDiagnostic, CliSession, Execution, FormatterReportFileDetail, FormatterReportSummary,
-    Report, ReportDiagnostic, ReportDiff, ReportErrorKind, ReportKind, TraversalMode,
-};
+use crate::reporter::{ConsoleReporter, Reporter, TraverseSummary};
+use crate::{CliDiagnostic, CliSession, Execution, TraversalMode};
 use biome_console::{fmt, markup, Console, ConsoleExt};
 use biome_diagnostics::{
     adapters::StdError, category, DiagnosticExt, Error, PrintDescription, PrintDiagnostic,
@@ -60,6 +58,7 @@ pub(crate) fn traverse(
     session: CliSession,
     cli_options: &CliOptions,
     inputs: Vec<OsString>,
+    mut reporter: impl Reporter,
 ) -> Result<(), CliDiagnostic> {
     init_thread_pool();
     if inputs.is_empty() && execution.as_stdin_file().is_none() {
@@ -71,7 +70,7 @@ pub(crate) fn traverse(
 
     let (interner, recv_files) = PathInterner::new();
     let (send_msgs, recv_msgs) = unbounded();
-    let (sender_reports, recv_reports) = unbounded();
+    // let (sender_reports, recv_reports) = unbounded();
 
     let processed = AtomicUsize::new(0);
     let skipped = AtomicUsize::new(0);
@@ -85,7 +84,6 @@ pub(crate) fn traverse(
 
     let mut errors: usize = 0;
     let mut warnings: usize = 0;
-    let mut report = Report::default();
 
     let duration = thread::scope(|s| {
         thread::Builder::new()
@@ -94,13 +92,13 @@ pub(crate) fn traverse(
                 process_messages(ProcessMessagesOptions {
                     execution: &execution,
                     console,
-                    recv_reports,
+                    // recv_reports,
                     recv_files,
                     recv_msgs,
                     max_diagnostics,
                     remaining_diagnostics: &remaining_diagnostics,
                     errors: &mut errors,
-                    report: &mut report,
+                    reporter: &mut reporter,
                     verbose: cli_options.verbose,
                     warnings: &mut warnings,
                 });
@@ -120,7 +118,7 @@ pub(crate) fn traverse(
                 processed: &processed,
                 skipped: &skipped,
                 messages: send_msgs,
-                sender_reports,
+                // sender_reports,
                 remaining_diagnostics: &remaining_diagnostics,
             },
         )
@@ -129,72 +127,81 @@ pub(crate) fn traverse(
     let count = processed.load(Ordering::Relaxed);
     let skipped = skipped.load(Ordering::Relaxed);
 
-    if execution.should_report_to_terminal() {
-        match execution.traversal_mode() {
-            TraversalMode::Check { .. } | TraversalMode::Lint { .. } => {
-                if execution.as_fix_file_mode().is_some() {
-                    console.log(markup! {
-                        <Info>"Fixed "{count}" file(s) in "{duration}</Info>
-                    });
-                } else {
-                    console.log(markup!({
-                        CheckResult {
-                            count,
-                            duration,
-                            errors,
-                        }
-                    }));
-                }
-            }
-            TraversalMode::CI { .. } => {
-                console.log(markup!({
-                    CheckResult {
-                        count,
-                        duration,
-                        errors,
-                    }
-                }));
-            }
-            TraversalMode::Format { write: false, .. } => {
-                console.log(markup! {
-                    <Info>"Compared "{count}" file(s) in "{duration}</Info>
-                });
-            }
-            TraversalMode::Format { write: true, .. } => {
-                console.log(markup! {
-                    <Info>"Formatted "{count}" file(s) in "{duration}</Info>
-                });
-            }
-
-            TraversalMode::Migrate { write: false, .. } => {
-                console.log(markup! {
-                    <Info>"Checked your configuration file in "{duration}</Info>
-                });
-            }
-
-            TraversalMode::Migrate { write: true, .. } => {
-                console.log(markup! {
-                    <Info>"Migrated your configuration file in "{duration}</Info>
-                });
-            }
-        }
-    } else {
-        if let TraversalMode::Format { write, .. } = execution.traversal_mode() {
-            let mut summary = FormatterReportSummary::default();
-            if *write {
-                summary.set_files_written(count);
-            } else {
-                summary.set_files_compared(count);
-            }
-            report.set_formatter_summary(summary);
-        }
-
-        let to_print = report.as_serialized_reports()?;
-        console.log(markup! {
-            {to_print}
-        });
-        return Ok(());
-    }
+    let summary = TraverseSummary {
+        count,
+        duration,
+        errors,
+        traverse: execution.traversal_mode(),
+    };
+    reporter.report_summary(summary);
+    // if execution.should_report_to_terminal() {
+    // match execution.traversal_mode() {
+    //
+    //
+    //     TraversalMode::Check { .. } | TraversalMode::Lint { .. } => {
+    //         if execution.as_fix_file_mode().is_some() {
+    //             console.log(markup! {
+    //                 <Info>"Fixed "{count}" file(s) in "{duration}</Info>
+    //             });
+    //         } else {
+    //             console.log(markup!({
+    //                 CheckResult {
+    //                     count,
+    //                     duration,
+    //                     errors,
+    //                 }
+    //             }));
+    //         }
+    //     }
+    //     TraversalMode::CI { .. } => {
+    //         console.log(markup!({
+    //             CheckResult {
+    //                 count,
+    //                 duration,
+    //                 errors,
+    //             }
+    //         }));
+    //     }
+    //     TraversalMode::Format { write: false, .. } => {
+    //         console.log(markup! {
+    //             <Info>"Compared "{count}" file(s) in "{duration}</Info>
+    //         });
+    //     }
+    //     TraversalMode::Format { write: true, .. } => {
+    //         console.log(markup! {
+    //             <Info>"Formatted "{count}" file(s) in "{duration}</Info>
+    //         });
+    //     }
+    //
+    //     TraversalMode::Migrate { write: false, .. } => {
+    //         console.log(markup! {
+    //             <Info>"Checked your configuration file in "{duration}</Info>
+    //         });
+    //     }
+    //
+    //     TraversalMode::Migrate { write: true, .. } => {
+    //         console.log(markup! {
+    //             <Info>"Migrated your configuration file in "{duration}</Info>
+    //         });
+    //     }
+    // }
+    // } else {
+    //     if let TraversalMode::Format { write, .. } = execution.traversal_mode() {
+    //         let mut summary = FormatterReportSummary::default();
+    //         if *write {
+    //             summary.set_files_written(count);
+    //         } else {
+    //             summary.set_files_compared(count);
+    //         }
+    //         reporter.set_formatter_summary(summary);
+    //     }
+    //
+    //     let to_print = reporter.as_serialized_reports()?;
+    //     console.log(markup! {
+    //         {to_print}
+    //     });
+    //     return Ok(());
+    // }
 
     if skipped > 0 {
         console.log(markup! {
@@ -257,7 +264,7 @@ struct ProcessMessagesOptions<'ctx> {
     /// Mutable reference to the [console](Console)
     console: &'ctx mut dyn Console,
     /// Receiver channel for reporting statistics
-    recv_reports: Receiver<ReportKind>,
+    // recv_reports: Receiver<ReportKind>,
     /// Receiver channel that expects info when a file is processed
     recv_files: Receiver<PathBuf>,
     /// Receiver channel that expects info when a message is sent
@@ -275,7 +282,7 @@ struct ProcessMessagesOptions<'ctx> {
     warnings: &'ctx mut usize,
     /// Mutable handle to a [Report] instance the console thread should write
     /// stats into
-    report: &'ctx mut Report,
+    reporter: &'ctx mut Reporter,
     /// Whether the console thread should print diagnostics in verbose mode
     verbose: bool,
 }
@@ -286,13 +293,13 @@ fn process_messages(options: ProcessMessagesOptions) {
     let ProcessMessagesOptions {
         execution: mode,
         console,
-        recv_reports,
+        // recv_reports,
         recv_files,
         recv_msgs,
         max_diagnostics,
         remaining_diagnostics,
         errors,
-        report,
+        reporter: report,
         verbose,
         warnings,
     } = options;
@@ -314,17 +321,17 @@ fn process_messages(options: ProcessMessagesOptions) {
                     continue;
                 },
             },
-            recv(recv_reports) -> stat => {
-                match stat {
-                    Ok(stat) => {
-                        report.push_detail_report(stat);
-                    }
-                    Err(_) => {
-                        is_report_open = false;
-                    },
-                }
-                continue;
-            }
+            // recv(recv_reports) -> stat => {
+            //     match stat {
+            //         Ok(stat) => {
+            //             report.push_detail_report(stat);
+            //         }
+            //         Err(_) => {
+            //             is_report_open = false;
+            //         },
+            //     }
+            //     continue;
+            // }
         };
 
         match msg {
@@ -406,16 +413,17 @@ fn process_messages(options: ProcessMessagesOptions) {
 
                     let file_name = path.unwrap_or("<unknown>");
                     let title = PrintDescription(&err).to_string();
-                    let code = err.category().and_then(|code| code.name().parse().ok());
+                    // let code = err.category().and_then(|code| code.name().parse().ok());
 
-                    report.push_detail_report(ReportKind::Error(
-                        file_name.to_string(),
-                        ReportErrorKind::Diagnostic(ReportDiagnostic {
-                            code,
-                            title,
-                            severity: err.severity(),
-                        }),
-                    ));
+                    report.report_diagnostic(file_name.to_string(), err);
+                    // report.push_detail_report(ReportKind::Error(
+                    //     file_name.to_string(),
+                    //     ReportErrorKind::Diagnostic(ReportDiagnostic {
+                    //         code,
+                    //         title,
+                    //         severity: err.severity(),
+                    //     }),
+                    // ));
                 }
             }
 
@@ -462,22 +470,7 @@ fn process_messages(options: ProcessMessagesOptions) {
                             not_printed_diagnostics += 1;
                         }
 
-                        if mode.should_report_to_terminal() {
-                            if should_print {
-                                let diag =
-                                    diag.with_file_path(&name).with_file_source_code(&content);
-                                diagnostics_to_print.push(diag)
-                            }
-                        } else {
-                            report.push_detail_report(ReportKind::Error(
-                                name.to_string(),
-                                ReportErrorKind::Diagnostic(ReportDiagnostic {
-                                    code: diag.category().and_then(|code| code.name().parse().ok()),
-                                    title: String::from("test here"),
-                                    severity,
-                                }),
-                            ));
-                        }
+                        diagnostics_to_print.push(diag)
                     }
                 }
             }
@@ -554,14 +547,14 @@ fn process_messages(options: ProcessMessagesOptions) {
                         }
                     }
                 } else {
-                    report.push_detail_report(ReportKind::Error(
-                        file_name,
-                        ReportErrorKind::Diff(ReportDiff {
-                            before: old,
-                            after: new,
-                            severity: Severity::Error,
-                        }),
-                    ));
+                    // report.push_detail_report(ReportKind::Error(
+                    //     file_name,
+                    //     ReportErrorKind::Diff(ReportDiff {
+                    //         before: old,
+                    //         after: new,
+                    //         severity: Severity::Error,
+                    //     }),
+                    // ));
                 }
             }
         }
@@ -605,7 +598,7 @@ pub(crate) struct TraversalOptions<'ctx, 'app> {
     /// Channel sending messages to the display thread
     pub(crate) messages: Sender<Message>,
     /// Channel sending reports to the reports thread
-    sender_reports: Sender<ReportKind>,
+    // sender_reports: Sender<ReportKind>,
     /// The approximate number of diagnostics the console will print before
     /// folding the rest into the "skipped diagnostics" counter
     pub(crate) remaining_diagnostics: &'ctx AtomicU16,
@@ -621,11 +614,11 @@ impl<'ctx, 'app> TraversalOptions<'ctx, 'app> {
         self.messages.send(msg.into()).ok();
     }
 
-    pub(crate) fn push_format_stat(&self, path: String, stat: FormatterReportFileDetail) {
-        self.sender_reports
-            .send(ReportKind::Formatter(path, stat))
-            .ok();
-    }
+    // pub(crate) fn push_format_stat(&self, path: String, stat: FormatterReportFileDetail) {
+    //     self.sender_reports
+    //         .send(ReportKind::Formatter(path, stat))
+    //         .ok();
+    // }
 
     pub(crate) fn miss_handler_err(&self, err: WorkspaceError, rome_path: &RomePath) {
         self.push_diagnostic(

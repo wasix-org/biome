@@ -6,6 +6,7 @@ mod traverse;
 
 use crate::cli_options::CliOptions;
 use crate::execute::traverse::traverse;
+use crate::reporter::ConsoleReporter;
 use crate::{CliDiagnostic, CliSession};
 use biome_diagnostics::{category, Category, MAXIMUM_DISPLAYABLE_DIAGNOSTICS};
 use biome_fs::RomePath;
@@ -13,6 +14,7 @@ use biome_service::workspace::{FeatureName, FixFileMode};
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
+use std::sync::RwLock;
 
 /// Useful information during the traversal of files and virtual content
 pub(crate) struct Execution {
@@ -256,6 +258,7 @@ pub(crate) fn execute_mode(
             cli_options.verbose,
         )
     } else {
-        traverse(mode, session, cli_options, paths)
+        let reporter = ConsoleReporter::new(true, cli_options.verbose);
+        traverse(mode, session, cli_options, paths, reporter)
     }
 }
