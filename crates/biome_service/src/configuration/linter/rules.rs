@@ -523,7 +523,8 @@ impl A11y {
         "useValidAriaValues",
         "useValidLang",
     ];
-    const RECOMMENDED_RULES: [&'static str; 24] = [
+    const RECOMMENDED_RULES: [&'static str; 26] = [
+        "noAccessKey",
         "noAriaUnsupportedElements",
         "noAutofocus",
         "noBlankTarget",
@@ -539,6 +540,7 @@ impl A11y {
         "useAnchorContent",
         "useAriaPropsForRole",
         "useButtonType",
+        "useHeadingContent",
         "useHtmlLang",
         "useIframeTitle",
         "useKeyWithClickEvents",
@@ -549,7 +551,8 @@ impl A11y {
         "useValidAriaValues",
         "useValidLang",
     ];
-    const RECOMMENDED_RULES_AS_FILTERS: [RuleFilter<'static>; 24] = [
+    const RECOMMENDED_RULES_AS_FILTERS: [RuleFilter<'static>; 26] = [
+        RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[0]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[1]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[2]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[3]),
@@ -565,6 +568,7 @@ impl A11y {
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[13]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[14]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[15]),
+        RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[16]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[17]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[18]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[19]),
@@ -892,7 +896,7 @@ impl A11y {
     pub(crate) fn is_recommended_rule(rule_name: &str) -> bool {
         Self::RECOMMENDED_RULES.contains(&rule_name)
     }
-    pub(crate) fn recommended_rules_as_filters() -> [RuleFilter<'static>; 24] {
+    pub(crate) fn recommended_rules_as_filters() -> [RuleFilter<'static>; 26] {
         Self::RECOMMENDED_RULES_AS_FILTERS
     }
     pub(crate) fn all_rules_as_filters() -> [RuleFilter<'static>; 26] {
@@ -2385,22 +2389,26 @@ impl Nursery {
         "useImportRestrictions",
         "useShorthandAssign",
     ];
-    const RECOMMENDED_RULES: [&'static str; 8] = [
+    const RECOMMENDED_RULES: [&'static str; 10] = [
         "noDuplicateJsonKeys",
         "noEmptyCharacterClassInRegex",
+        "noInteractiveElementToNoninteractiveRole",
         "noInvalidNewBuiltin",
         "noMisleadingInstantiator",
         "noUselessElse",
+        "useAriaActivedescendantWithTabindex",
         "useArrowFunction",
         "useAsConstAssertion",
         "useGroupedTypeImport",
     ];
-    const RECOMMENDED_RULES_AS_FILTERS: [RuleFilter<'static>; 8] = [
+    const RECOMMENDED_RULES_AS_FILTERS: [RuleFilter<'static>; 10] = [
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[1]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[3]),
+        RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[4]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[5]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[6]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[9]),
+        RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[11]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[12]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[13]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[14]),
@@ -2623,7 +2631,7 @@ impl Nursery {
     pub(crate) fn is_recommended_rule(rule_name: &str) -> bool {
         Self::RECOMMENDED_RULES.contains(&rule_name)
     }
-    pub(crate) fn recommended_rules_as_filters() -> [RuleFilter<'static>; 8] {
+    pub(crate) fn recommended_rules_as_filters() -> [RuleFilter<'static>; 10] {
         Self::RECOMMENDED_RULES_AS_FILTERS
     }
     pub(crate) fn all_rules_as_filters() -> [RuleFilter<'static>; 17] {
