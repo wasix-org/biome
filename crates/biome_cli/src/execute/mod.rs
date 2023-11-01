@@ -60,6 +60,9 @@ pub(crate) enum TraversalMode {
         /// 1. The virtual path to the file
         /// 2. The content of the file
         stdin: Option<(PathBuf, String)>,
+
+        /// Whether the user wants to review the changes using the `--review` argument
+        review: bool,
     },
     /// This mode is enabled when running the command `biome ci`
     CI,
@@ -143,6 +146,16 @@ impl Execution {
             TraversalMode::Format { .. } | TraversalMode::CI | TraversalMode::Migrate { .. } => {
                 None
             }
+        }
+    }
+
+    pub(crate) fn interactive(&self) -> bool {
+        match &self.traversal_mode {
+            TraversalMode::Lint { review, .. } => *review,
+            TraversalMode::Format { .. }
+            | TraversalMode::CI
+            | TraversalMode::Migrate { .. }
+            | TraversalMode::Check { .. } => false,
         }
     }
 

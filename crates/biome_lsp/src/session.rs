@@ -300,6 +300,7 @@ impl Session {
                 path: rome_path,
                 categories,
                 max_diagnostics: u64::MAX,
+                with_suppression: false,
             })?;
 
             tracing::trace!("biome diagnostics: {:#?}", result.diagnostics);

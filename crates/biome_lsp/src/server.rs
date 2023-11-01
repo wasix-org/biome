@@ -555,7 +555,7 @@ impl ServerFactory {
         workspace_method!(builder, get_file_content);
         workspace_method!(builder, close_file);
         workspace_method!(builder, pull_diagnostics);
-        workspace_method!(builder, pull_actions);
+        workspace_method!(builder, pull_actions_from_range);
         workspace_method!(builder, format_file);
         workspace_method!(builder, format_range);
         workspace_method!(builder, format_on_type);

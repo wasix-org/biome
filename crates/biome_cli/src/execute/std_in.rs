@@ -107,6 +107,7 @@ pub(crate) fn run<'a>(
                 categories: RuleCategories::LINT | RuleCategories::SYNTAX,
                 path: rome_path.clone(),
                 max_diagnostics: mode.max_diagnostics.into(),
+                with_suppression: false,
             })?;
             diagnostics.extend(result.diagnostics);
         }

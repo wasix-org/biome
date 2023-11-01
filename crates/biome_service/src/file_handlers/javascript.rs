@@ -336,7 +336,9 @@ fn lint(params: LintParams) -> LintResults {
 
                 if diagnostic_count <= params.max_diagnostics {
                     for action in signal.actions() {
-                        if !action.is_suppression() {
+                        if (action.is_suppression() && params.with_suppression)
+                            || !action.is_suppression()
+                        {
                             diagnostic = diagnostic.add_code_suggestion(action.into());
                         }
                     }
@@ -397,7 +399,7 @@ impl RegistryVisitor<JsLanguage> for ActionsVisitor<'_> {
 #[tracing::instrument(level = "trace", skip(parse))]
 fn code_actions(
     parse: AnyParse,
-    range: TextRange,
+    range: Option<TextRange>,
     rules: Option<&Rules>,
     settings: SettingsHandle,
     path: &RomePath,
@@ -433,7 +435,7 @@ fn code_actions(
     if settings.as_ref().organize_imports.enabled {
         filter.categories |= RuleCategories::ACTION;
     }
-    filter.range = Some(range);
+    filter.range = range;
 
     trace!("Filter applied for code actions: {:?}", &filter);
     let analyzer_options = compute_analyzer_options(&settings, PathBuf::from(path.as_path()));

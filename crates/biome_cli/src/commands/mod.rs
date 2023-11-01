@@ -98,6 +98,11 @@ pub enum BiomeCommand {
         /// Apply safe fixes and unsafe fixes, formatting and import sorting
         #[bpaf(long("apply-unsafe"), switch)]
         apply_unsafe: bool,
+
+        /// It runs the lint command in interactive mode, where fixes are chose manually
+        #[bpaf(long("review"), switch)]
+        review: bool,
+
         #[bpaf(external, hide_usage, optional)]
         linter_configuration: Option<LinterConfiguration>,
 

@@ -21,18 +21,10 @@ fn command_name() -> String {
 /// When displaying the diagnostic,
 #[derive(Debug)]
 pub enum CliDiagnostic {
-    /// Returned when it is called with a subcommand it doesn't know
-    UnknownCommand(UnknownCommand),
-    /// Return by the help command when it is called with a subcommand it doesn't know
-    UnknownCommandHelp(UnknownCommandHelp),
     /// Returned when the value of a command line argument could not be parsed
     ParseError(ParseDiagnostic),
-    /// Returned when the CLI  doesn't recognize a command line argument
-    UnexpectedArgument(UnexpectedArgument),
     /// Returned when a required argument is not present in the command line
     MissingArgument(MissingArgument),
-    /// Returned when a subcommand is called without any arguments
-    EmptyArguments(EmptyArguments),
     /// Returned when a subcommand is called with an unsupported combination of arguments
     IncompatibleArguments(IncompatibleArguments),
     /// Returned by a traversal command when error diagnostics were emitted
@@ -63,32 +55,6 @@ pub enum CliDiagnostic {
 #[diagnostic(
     category = "flags/invalid",
     severity = Error,
-    message(
-        description = "Unknown command {command_name}",
-        message("Unknown command "<Emphasis>{self.command_name}</Emphasis>)
-    ),
-)]
-pub struct UnknownCommand {
-    command_name: String,
-}
-
-#[derive(Debug, Diagnostic)]
-#[diagnostic(
-category = "flags/invalid",
-    severity = Error,
-    message(
-        description = "Cannot print help for unknown command {command_name}",
-        message("Cannot print help for unknown command "<Emphasis>{self.command_name}</Emphasis>)
-    ),
-)]
-pub struct UnknownCommandHelp {
-    command_name: String,
-}
-
-#[derive(Debug, Diagnostic)]
-#[diagnostic(
-    category = "flags/invalid",
-    severity = Error,
 )]
 pub struct ParseDiagnostic {
     #[message]
@@ -96,21 +62,6 @@ pub struct ParseDiagnostic {
     message: MessageAndDescription,
     #[source]
     source: Option<Error>,
-}
-
-#[derive(Debug, Diagnostic)]
-#[diagnostic(
-    category = "flags/invalid",
-    severity = Error,
-    message(
-        description = "Unrecognized option {argument}",
-        message("Unrecognized option "<Emphasis>{self.argument}</Emphasis>".")
-    ),
-)]
-pub struct UnexpectedArgument {
-    argument: String,
-    #[advice]
-    help: CliAdvice,
 }
 
 #[derive(Debug, Diagnostic)]
@@ -127,14 +78,6 @@ pub struct MissingArgument {
     #[advice]
     advice: CliAdvice,
 }
-
-#[derive(Debug, Diagnostic)]
-#[diagnostic(
-    category = "flags/invalid",
-    severity = Error,
-    message = "Empty arguments"
-)]
-pub struct EmptyArguments;
 
 #[derive(Debug, Diagnostic)]
 #[diagnostic(
@@ -359,18 +302,6 @@ impl CliDiagnostic {
         })
     }
 
-    /// Returned when it is called with a subcommand it doesn't know
-    pub fn unknown_command(command: impl Into<String>) -> Self {
-        Self::UnknownCommand(UnknownCommand {
-            command_name: command.into(),
-        })
-    }
-
-    /// Returned when a subcommand is called without any arguments
-    pub fn empty_arguments() -> Self {
-        Self::EmptyArguments(EmptyArguments)
-    }
-
     /// Returned when a required argument is not present in the command line
     pub fn missing_argument(argument: impl Into<String>, subcommand: impl Into<String>) -> Self {
         Self::MissingArgument(MissingArgument {
@@ -382,14 +313,6 @@ impl CliDiagnostic {
     /// When no files were processed while traversing the file system
     pub fn no_files_processed() -> Self {
         Self::NoFilesWereProcessed(NoFilesWereProcessed)
-    }
-
-    /// Returned when the CLI  doesn't recognize a command line argument
-    pub fn unexpected_argument(argument: impl Into<String>, subcommand: impl Into<String>) -> Self {
-        Self::UnexpectedArgument(UnexpectedArgument {
-            argument: argument.into(),
-            help: CliAdvice::new_with_help(subcommand),
-        })
     }
 
     /// When there's been error inside the workspace
@@ -508,24 +431,13 @@ impl CliDiagnostic {
             maximum,
         })
     }
-
-    /// Return by the help command when it is called with a subcommand it doesn't know
-    pub fn new_unknown_help(command: impl Into<String>) -> Self {
-        Self::UnknownCommandHelp(UnknownCommandHelp {
-            command_name: command.into(),
-        })
-    }
 }
 
 impl Diagnostic for CliDiagnostic {
     fn category(&self) -> Option<&'static Category> {
         match self {
-            CliDiagnostic::UnknownCommand(diagnostic) => diagnostic.category(),
-            CliDiagnostic::UnknownCommandHelp(diagnostic) => diagnostic.category(),
             CliDiagnostic::ParseError(diagnostic) => diagnostic.category(),
-            CliDiagnostic::UnexpectedArgument(diagnostic) => diagnostic.category(),
             CliDiagnostic::MissingArgument(diagnostic) => diagnostic.category(),
-            CliDiagnostic::EmptyArguments(diagnostic) => diagnostic.category(),
             CliDiagnostic::IncompatibleArguments(diagnostic) => diagnostic.category(),
             CliDiagnostic::CheckError(diagnostic) => diagnostic.category(),
             CliDiagnostic::OverflowNumberArgument(diagnostic) => diagnostic.category(),
@@ -542,12 +454,8 @@ impl Diagnostic for CliDiagnostic {
 
     fn tags(&self) -> DiagnosticTags {
         match self {
-            CliDiagnostic::UnknownCommand(diagnostic) => diagnostic.tags(),
-            CliDiagnostic::UnknownCommandHelp(diagnostic) => diagnostic.tags(),
             CliDiagnostic::ParseError(diagnostic) => diagnostic.tags(),
-            CliDiagnostic::UnexpectedArgument(diagnostic) => diagnostic.tags(),
             CliDiagnostic::MissingArgument(diagnostic) => diagnostic.tags(),
-            CliDiagnostic::EmptyArguments(diagnostic) => diagnostic.tags(),
             CliDiagnostic::IncompatibleArguments(diagnostic) => diagnostic.tags(),
             CliDiagnostic::CheckError(diagnostic) => diagnostic.tags(),
             CliDiagnostic::OverflowNumberArgument(diagnostic) => diagnostic.tags(),
@@ -564,12 +472,8 @@ impl Diagnostic for CliDiagnostic {
 
     fn severity(&self) -> Severity {
         match self {
-            CliDiagnostic::UnknownCommand(diagnostic) => diagnostic.severity(),
-            CliDiagnostic::UnknownCommandHelp(diagnostic) => diagnostic.severity(),
             CliDiagnostic::ParseError(diagnostic) => diagnostic.severity(),
-            CliDiagnostic::UnexpectedArgument(diagnostic) => diagnostic.severity(),
             CliDiagnostic::MissingArgument(diagnostic) => diagnostic.severity(),
-            CliDiagnostic::EmptyArguments(diagnostic) => diagnostic.severity(),
             CliDiagnostic::IncompatibleArguments(diagnostic) => diagnostic.severity(),
             CliDiagnostic::CheckError(diagnostic) => diagnostic.severity(),
             CliDiagnostic::OverflowNumberArgument(diagnostic) => diagnostic.severity(),
@@ -586,12 +490,8 @@ impl Diagnostic for CliDiagnostic {
 
     fn location(&self) -> Location<'_> {
         match self {
-            CliDiagnostic::UnknownCommand(diagnostic) => diagnostic.location(),
-            CliDiagnostic::UnknownCommandHelp(diagnostic) => diagnostic.location(),
             CliDiagnostic::ParseError(diagnostic) => diagnostic.location(),
-            CliDiagnostic::UnexpectedArgument(diagnostic) => diagnostic.location(),
             CliDiagnostic::MissingArgument(diagnostic) => diagnostic.location(),
-            CliDiagnostic::EmptyArguments(diagnostic) => diagnostic.location(),
             CliDiagnostic::IncompatibleArguments(diagnostic) => diagnostic.location(),
             CliDiagnostic::CheckError(diagnostic) => diagnostic.location(),
             CliDiagnostic::OverflowNumberArgument(diagnostic) => diagnostic.location(),
@@ -608,12 +508,8 @@ impl Diagnostic for CliDiagnostic {
 
     fn message(&self, fmt: &mut Formatter<'_>) -> std::io::Result<()> {
         match self {
-            CliDiagnostic::UnknownCommand(diagnostic) => diagnostic.message(fmt),
-            CliDiagnostic::UnknownCommandHelp(diagnostic) => diagnostic.message(fmt),
             CliDiagnostic::ParseError(diagnostic) => diagnostic.message(fmt),
-            CliDiagnostic::UnexpectedArgument(diagnostic) => diagnostic.message(fmt),
             CliDiagnostic::MissingArgument(diagnostic) => diagnostic.message(fmt),
-            CliDiagnostic::EmptyArguments(diagnostic) => diagnostic.message(fmt),
             CliDiagnostic::IncompatibleArguments(diagnostic) => diagnostic.message(fmt),
             CliDiagnostic::CheckError(diagnostic) => diagnostic.message(fmt),
             CliDiagnostic::OverflowNumberArgument(diagnostic) => diagnostic.message(fmt),
@@ -630,12 +526,8 @@ impl Diagnostic for CliDiagnostic {
 
     fn description(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CliDiagnostic::UnknownCommand(diagnostic) => diagnostic.description(fmt),
-            CliDiagnostic::UnknownCommandHelp(diagnostic) => diagnostic.description(fmt),
             CliDiagnostic::ParseError(diagnostic) => diagnostic.description(fmt),
-            CliDiagnostic::UnexpectedArgument(diagnostic) => diagnostic.description(fmt),
             CliDiagnostic::MissingArgument(diagnostic) => diagnostic.description(fmt),
-            CliDiagnostic::EmptyArguments(diagnostic) => diagnostic.description(fmt),
             CliDiagnostic::IncompatibleArguments(diagnostic) => diagnostic.description(fmt),
             CliDiagnostic::CheckError(diagnostic) => diagnostic.description(fmt),
             CliDiagnostic::OverflowNumberArgument(diagnostic) => diagnostic.description(fmt),
@@ -652,12 +544,8 @@ impl Diagnostic for CliDiagnostic {
 
     fn advices(&self, visitor: &mut dyn Visit) -> std::io::Result<()> {
         match self {
-            CliDiagnostic::UnknownCommand(diagnostic) => diagnostic.advices(visitor),
-            CliDiagnostic::UnknownCommandHelp(diagnostic) => diagnostic.advices(visitor),
             CliDiagnostic::ParseError(diagnostic) => diagnostic.advices(visitor),
-            CliDiagnostic::UnexpectedArgument(diagnostic) => diagnostic.advices(visitor),
             CliDiagnostic::MissingArgument(diagnostic) => diagnostic.advices(visitor),
-            CliDiagnostic::EmptyArguments(diagnostic) => diagnostic.advices(visitor),
             CliDiagnostic::IncompatibleArguments(diagnostic) => diagnostic.advices(visitor),
             CliDiagnostic::CheckError(diagnostic) => diagnostic.advices(visitor),
             CliDiagnostic::OverflowNumberArgument(diagnostic) => diagnostic.advices(visitor),
@@ -674,12 +562,8 @@ impl Diagnostic for CliDiagnostic {
 
     fn verbose_advices(&self, visitor: &mut dyn Visit) -> std::io::Result<()> {
         match self {
-            CliDiagnostic::UnknownCommand(diagnostic) => diagnostic.verbose_advices(visitor),
-            CliDiagnostic::UnknownCommandHelp(diagnostic) => diagnostic.verbose_advices(visitor),
             CliDiagnostic::ParseError(diagnostic) => diagnostic.verbose_advices(visitor),
-            CliDiagnostic::UnexpectedArgument(diagnostic) => diagnostic.verbose_advices(visitor),
             CliDiagnostic::MissingArgument(diagnostic) => diagnostic.verbose_advices(visitor),
-            CliDiagnostic::EmptyArguments(diagnostic) => diagnostic.verbose_advices(visitor),
             CliDiagnostic::IncompatibleArguments(diagnostic) => diagnostic.verbose_advices(visitor),
             CliDiagnostic::CheckError(diagnostic) => diagnostic.verbose_advices(visitor),
             CliDiagnostic::OverflowNumberArgument(diagnostic) => {
@@ -700,12 +584,8 @@ impl Diagnostic for CliDiagnostic {
 
     fn source(&self) -> Option<&dyn Diagnostic> {
         match self {
-            CliDiagnostic::UnknownCommand(diagnostic) => diagnostic.source(),
-            CliDiagnostic::UnknownCommandHelp(diagnostic) => diagnostic.source(),
             CliDiagnostic::ParseError(diagnostic) => diagnostic.source(),
-            CliDiagnostic::UnexpectedArgument(diagnostic) => diagnostic.source(),
             CliDiagnostic::MissingArgument(diagnostic) => diagnostic.source(),
-            CliDiagnostic::EmptyArguments(diagnostic) => diagnostic.source(),
             CliDiagnostic::IncompatibleArguments(diagnostic) => diagnostic.source(),
             CliDiagnostic::CheckError(diagnostic) => diagnostic.source(),
             CliDiagnostic::OverflowNumberArgument(diagnostic) => diagnostic.source(),

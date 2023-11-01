@@ -347,7 +347,7 @@ fn lint(params: LintParams) -> LintResults {
 }
 fn code_actions(
     _parse: AnyParse,
-    _range: TextRange,
+    _range: Option<TextRange>,
     _rules: Option<&Rules>,
     _settings: SettingsHandle,
     _path: &RomePath,

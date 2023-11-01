@@ -20,6 +20,7 @@ pub(crate) struct LintCommandPayload {
     pub(crate) files_configuration: Option<FilesConfiguration>,
     pub(crate) paths: Vec<OsString>,
     pub(crate) stdin_file_path: Option<String>,
+    pub(crate) review: bool,
 }
 
 /// Handler for the "lint" command of the Biome CLI
@@ -36,9 +37,19 @@ pub(crate) fn lint(
         stdin_file_path,
         vcs_configuration,
         files_configuration,
+        review,
     } = payload;
+
     setup_cli_subscriber(cli_options.log_level.clone(), cli_options.log_kind.clone());
 
+    if review && (!apply_unsafe && !apply) {
+        if !apply_unsafe {
+            return Err(CliDiagnostic::missing_argument("apply-unsafe", "lint"));
+        } else if !apply {
+            return Err(CliDiagnostic::missing_argument("apply", "lint"));
+        }
+    }
+    // no point in doing the traversal if all the checks have been disabled
     let fix_file_mode = if apply && apply_unsafe {
         return Err(CliDiagnostic::incompatible_arguments(
             "--apply",
@@ -99,6 +110,7 @@ pub(crate) fn lint(
         Execution::new(TraversalMode::Lint {
             fix_file_mode,
             stdin,
+            review,
         }),
         session,
         &cli_options,

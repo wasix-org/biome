@@ -7,7 +7,7 @@ use biome_analyze::{ActionCategory, SourceActionKind};
 use biome_diagnostics::Applicability;
 use biome_fs::RomePath;
 use biome_service::workspace::{
-    FeatureName, FeaturesBuilder, FixFileMode, FixFileParams, PullActionsParams,
+    FeatureName, FeaturesBuilder, FixFileMode, FixFileParams, PullActionsFromRangeParams,
     SupportsFeatureParams,
 };
 use biome_service::WorkspaceError;
@@ -83,10 +83,12 @@ pub(crate) fn code_actions(
             )
         })?;
 
-    let result = match session.workspace.pull_actions(PullActionsParams {
-        path: rome_path.clone(),
-        range: cursor_range,
-    }) {
+    let result = match session
+        .workspace
+        .pull_actions_from_range(PullActionsFromRangeParams {
+            path: rome_path.clone(),
+            range: cursor_range,
+        }) {
         Ok(result) => result,
         Err(err) => {
             return if matches!(err, WorkspaceError::FileIgnored(_)) {

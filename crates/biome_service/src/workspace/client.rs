@@ -1,6 +1,6 @@
 use crate::workspace::{
     FileFeaturesResult, GetFileContentParams, IsPathIgnoredParams, OrganizeImportsParams,
-    OrganizeImportsResult, RageParams, RageResult, ServerInfo,
+    OrganizeImportsResult, PullActionsParams, RageParams, RageResult, ServerInfo,
 };
 use crate::{TransportError, Workspace, WorkspaceError};
 use biome_formatter::Printed;
@@ -14,8 +14,8 @@ use std::{
 use super::{
     ChangeFileParams, CloseFileParams, FixFileParams, FixFileResult, FormatFileParams,
     FormatOnTypeParams, FormatRangeParams, GetControlFlowGraphParams, GetFormatterIRParams,
-    GetSyntaxTreeParams, GetSyntaxTreeResult, OpenFileParams, PullActionsParams, PullActionsResult,
-    PullDiagnosticsParams, PullDiagnosticsResult, RenameParams, RenameResult,
+    GetSyntaxTreeParams, GetSyntaxTreeResult, OpenFileParams, PullActionsFromRangeParams,
+    PullActionsResult, PullDiagnosticsParams, PullDiagnosticsResult, RenameParams, RenameResult,
     SupportsFeatureParams, UpdateSettingsParams,
 };
 
@@ -154,6 +154,13 @@ where
         params: PullDiagnosticsParams,
     ) -> Result<PullDiagnosticsResult, WorkspaceError> {
         self.request("biome/pull_diagnostics", params)
+    }
+
+    fn pull_actions_from_range(
+        &self,
+        params: PullActionsFromRangeParams,
+    ) -> Result<PullActionsResult, WorkspaceError> {
+        self.request("biome/pull_actions_from_range", params)
     }
 
     fn pull_actions(&self, params: PullActionsParams) -> Result<PullActionsResult, WorkspaceError> {

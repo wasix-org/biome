@@ -336,6 +336,7 @@ pub struct PullDiagnosticsParams {
     pub path: RomePath,
     pub categories: RuleCategories,
     pub max_diagnostics: u64,
+    pub with_suppression: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -349,6 +350,12 @@ pub struct PullDiagnosticsResult {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PullActionsParams {
+    pub path: RomePath,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PullActionsFromRangeParams {
     pub path: RomePath,
     pub range: TextRange,
 }
@@ -571,6 +578,13 @@ pub trait Workspace: Send + Sync + RefUnwindSafe {
 
     /// Retrieves the list of code actions available for a given cursor
     /// position within a file
+    fn pull_actions_from_range(
+        &self,
+        params: PullActionsFromRangeParams,
+    ) -> Result<PullActionsResult, WorkspaceError>;
+
+    /// Retrieves the list of code actions available for a given cursor
+    /// position within a file
     fn pull_actions(&self, params: PullActionsParams) -> Result<PullActionsResult, WorkspaceError>;
 
     /// Runs the given file through the formatter using the provided options
@@ -668,18 +682,30 @@ impl<'app, W: Workspace + ?Sized> FileGuard<'app, W> {
         &self,
         categories: RuleCategories,
         max_diagnostics: u64,
+        with_suppression: bool,
     ) -> Result<PullDiagnosticsResult, WorkspaceError> {
         self.workspace.pull_diagnostics(PullDiagnosticsParams {
             path: self.path.clone(),
             categories,
             max_diagnostics,
+            with_suppression,
         })
     }
 
-    pub fn pull_actions(&self, range: TextRange) -> Result<PullActionsResult, WorkspaceError> {
+    pub fn pull_actions_from_range(
+        &self,
+        range: TextRange,
+    ) -> Result<PullActionsResult, WorkspaceError> {
+        self.workspace
+            .pull_actions_from_range(PullActionsFromRangeParams {
+                path: self.path.clone(),
+                range,
+            })
+    }
+
+    pub fn pull_actions(&self) -> Result<PullActionsResult, WorkspaceError> {
         self.workspace.pull_actions(PullActionsParams {
             path: self.path.clone(),
-            range,
         })
     }
 

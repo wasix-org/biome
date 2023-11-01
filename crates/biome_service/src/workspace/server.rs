@@ -1,15 +1,15 @@
 use super::{
     ChangeFileParams, CloseFileParams, FeatureName, FixFileResult, FormatFileParams,
     FormatOnTypeParams, FormatRangeParams, GetControlFlowGraphParams, GetFormatterIRParams,
-    GetSyntaxTreeParams, GetSyntaxTreeResult, OpenFileParams, PullActionsParams, PullActionsResult,
-    PullDiagnosticsParams, PullDiagnosticsResult, RenameResult, SupportsFeatureParams,
-    UpdateSettingsParams,
+    GetSyntaxTreeParams, GetSyntaxTreeResult, OpenFileParams, PullActionsFromRangeParams,
+    PullActionsResult, PullDiagnosticsParams, PullDiagnosticsResult, RenameResult,
+    SupportsFeatureParams, UpdateSettingsParams,
 };
 use crate::file_handlers::{Capabilities, FixAllParams, Language, LintParams};
 use crate::settings::OverrideSettings;
 use crate::workspace::{
     FileFeaturesResult, GetFileContentParams, IsPathIgnoredParams, OrganizeImportsParams,
-    OrganizeImportsResult, RageEntry, RageParams, RageResult, ServerInfo,
+    OrganizeImportsResult, PullActionsParams, RageEntry, RageParams, RageResult, ServerInfo,
 };
 use crate::{
     file_handlers::Features,
@@ -492,6 +492,7 @@ impl Workspace for WorkspaceServer {
                     settings: self.settings(),
                     max_diagnostics: params.max_diagnostics,
                     path: &params.path,
+                    with_suppression: params.with_suppression,
                 });
 
                 (
@@ -525,6 +526,30 @@ impl Workspace for WorkspaceServer {
 
     /// Retrieves the list of code actions available for a given cursor
     /// position within a file
+    fn pull_actions_from_range(
+        &self,
+        params: PullActionsFromRangeParams,
+    ) -> Result<PullActionsResult, WorkspaceError> {
+        let capabilities = self.get_capabilities(&params.path);
+        let code_actions = capabilities
+            .analyzer
+            .code_actions
+            .ok_or_else(self.build_capability_error(&params.path))?;
+
+        let parse = self.get_parse(params.path.clone(), Some(FeatureName::Lint))?;
+        let settings = self.settings.read().unwrap();
+        let rules = settings.linter().rules.as_ref();
+        Ok(code_actions(
+            parse,
+            Some(params.range),
+            rules,
+            self.settings(),
+            &params.path,
+        ))
+    }
+
+    /// Retrieves the list of code actions available for a given cursor
+    /// position within a file
     fn pull_actions(&self, params: PullActionsParams) -> Result<PullActionsResult, WorkspaceError> {
         let capabilities = self.get_capabilities(&params.path);
         let code_actions = capabilities
@@ -537,7 +562,7 @@ impl Workspace for WorkspaceServer {
         let rules = settings.linter().rules.as_ref();
         Ok(code_actions(
             parse,
-            params.range,
+            None,
             rules,
             self.settings(),
             &params.path,

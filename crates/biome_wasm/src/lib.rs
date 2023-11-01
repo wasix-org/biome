@@ -4,8 +4,8 @@ use wasm_bindgen::prelude::*;
 use biome_service::workspace::{
     self, ChangeFileParams, CloseFileParams, FixFileParams, FormatFileParams, FormatOnTypeParams,
     FormatRangeParams, GetControlFlowGraphParams, GetFileContentParams, GetFormatterIRParams,
-    GetSyntaxTreeParams, OrganizeImportsParams, PullActionsParams, PullDiagnosticsParams,
-    RenameParams, UpdateSettingsParams,
+    GetSyntaxTreeParams, OrganizeImportsParams, PullActionsFromRangeParams, PullActionsParams,
+    PullDiagnosticsParams, RenameParams, UpdateSettingsParams,
 };
 use biome_service::workspace::{OpenFileParams, SupportsFeatureParams};
 
@@ -129,6 +129,21 @@ impl Workspace {
             .map_err(into_error)
     }
 
+    #[wasm_bindgen(js_name = pullActionsFromRange)]
+    pub fn pull_actions_from_range(
+        &self,
+        params: IPullActionsFromRangeParams,
+    ) -> Result<IPullActionsResult, Error> {
+        let params: PullActionsFromRangeParams =
+            serde_wasm_bindgen::from_value(params.into()).map_err(into_error)?;
+        let result = self
+            .inner
+            .pull_actions_from_range(params)
+            .map_err(into_error)?;
+        to_value(&result)
+            .map(IPullActionsResult::from)
+            .map_err(into_error)
+    }
     #[wasm_bindgen(js_name = pullActions)]
     pub fn pull_actions(&self, params: IPullActionsParams) -> Result<IPullActionsResult, Error> {
         let params: PullActionsParams =

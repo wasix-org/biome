@@ -244,6 +244,7 @@ pub(crate) struct LintParams<'a> {
     pub(crate) settings: SettingsHandle<'a>,
     pub(crate) max_diagnostics: u64,
     pub(crate) path: &'a RomePath,
+    pub(crate) with_suppression: bool,
 }
 
 pub(crate) struct LintResults {
@@ -254,7 +255,7 @@ pub(crate) struct LintResults {
 
 type Lint = fn(LintParams) -> LintResults;
 type CodeActions =
-    fn(AnyParse, TextRange, Option<&Rules>, SettingsHandle, &RomePath) -> PullActionsResult;
+    fn(AnyParse, Option<TextRange>, Option<&Rules>, SettingsHandle, &RomePath) -> PullActionsResult;
 type FixAll = fn(FixAllParams) -> Result<FixFileResult, WorkspaceError>;
 type Rename = fn(&RomePath, AnyParse, TextSize, String) -> Result<RenameResult, WorkspaceError>;
 type OrganizeImports = fn(AnyParse) -> Result<OrganizeImportsResult, WorkspaceError>;
