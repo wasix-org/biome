@@ -12,7 +12,7 @@ statement();
 # Emitted Messages
 
 ```block
-{"formatter":{"summary":{"filesCompared":null,"filesWritten":1},"files":{}},"diagnostics":{}}
+Formatted 1 file(s) in <TIME>
 ```
 
 

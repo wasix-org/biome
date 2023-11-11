@@ -4,13 +4,10 @@ use crate::execute::diagnostics::{
     CIFormatDiffDiagnostic, CIOrganizeImportsDiffDiagnostic, ContentDiffAdvice,
     FormatDiffDiagnostic, OrganizeImportsDiffDiagnostic, PanicDiagnostic,
 };
-use crate::reporter::{ConsoleReporter, Reporter, TraverseSummary};
+use crate::reporter::Reporter;
 use crate::{CliDiagnostic, CliSession, Execution, TraversalMode};
-use biome_console::{fmt, markup, Console, ConsoleExt};
-use biome_diagnostics::{
-    adapters::StdError, category, DiagnosticExt, Error, PrintDescription, PrintDiagnostic,
-    Resource, Severity,
-};
+use biome_console::Console;
+use biome_diagnostics::{adapters::StdError, category, DiagnosticExt, Error, Resource, Severity};
 use biome_fs::{FileSystem, PathInterner, RomePath};
 use biome_fs::{TraversalContext, TraversalScope};
 use biome_service::workspace::{FeaturesBuilder, IsPathIgnoredParams};
@@ -18,14 +15,14 @@ use biome_service::{
     workspace::{FeatureName, SupportsFeatureParams},
     Workspace, WorkspaceError,
 };
-use crossbeam::{
-    channel::{unbounded, Receiver, Sender},
-    select,
-};
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use rustc_hash::FxHashSet;
+use std::cell::Cell;
+use std::ops::Add;
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Mutex;
 use std::{
     ffi::OsString,
-    io,
     panic::catch_unwind,
     path::{Path, PathBuf},
     sync::{
@@ -35,22 +32,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-
-struct CheckResult {
-    count: usize,
-    duration: Duration,
-    errors: usize,
-}
-impl fmt::Display for CheckResult {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> io::Result<()> {
-        markup!(<Info>"Checked "{self.count}" file(s) in "{self.duration}</Info>).fmt(fmt)?;
-
-        if self.errors > 0 {
-            markup!("\n"<Error>"Found "{self.errors}" error(s)"</Error>).fmt(fmt)?
-        }
-        Ok(())
-    }
-}
 
 ///
 pub(crate) fn traverse(
@@ -70,44 +51,37 @@ pub(crate) fn traverse(
 
     let (interner, recv_files) = PathInterner::new();
     let (send_msgs, recv_msgs) = unbounded();
-    // let (sender_reports, recv_reports) = unbounded();
 
     let processed = AtomicUsize::new(0);
     let skipped = AtomicUsize::new(0);
+    let errors = AtomicUsize::new(0);
 
     let fs = &*session.app.fs;
     let workspace = &*session.app.workspace;
-    let console = &mut *session.app.console;
 
     let max_diagnostics = execution.get_max_diagnostics();
     let remaining_diagnostics = AtomicU16::new(max_diagnostics);
 
-    let mut errors: usize = 0;
     let mut warnings: usize = 0;
-
+    let mut p = ProcessMessagesOptions {
+        execution: &execution,
+        recv_files,
+        recv_msgs,
+        max_diagnostics,
+        remaining_diagnostics: &remaining_diagnostics,
+        errors: &errors,
+        report: &mut reporter,
+        warnings: &mut warnings,
+    };
     let duration = thread::scope(|s| {
-        thread::Builder::new()
+        let handle = thread::Builder::new()
             .name(String::from("biome::console"))
-            .spawn_scoped(s, || {
-                process_messages(ProcessMessagesOptions {
-                    execution: &execution,
-                    console,
-                    // recv_reports,
-                    recv_files,
-                    recv_msgs,
-                    max_diagnostics,
-                    remaining_diagnostics: &remaining_diagnostics,
-                    errors: &mut errors,
-                    reporter: &mut reporter,
-                    verbose: cli_options.verbose,
-                    warnings: &mut warnings,
-                });
-            })
+            .spawn_scoped(s, || p.process_messages())
             .expect("failed to spawn console thread");
 
         // The traversal context is scoped to ensure all the channels it
         // contains are properly closed once the traversal finishes
-        traverse_inputs(
+        let elapsed = traverse_inputs(
             fs,
             inputs,
             &TraversalOptions {
@@ -118,117 +92,30 @@ pub(crate) fn traverse(
                 processed: &processed,
                 skipped: &skipped,
                 messages: send_msgs,
+                errors: &errors,
                 // sender_reports,
                 remaining_diagnostics: &remaining_diagnostics,
             },
-        )
+        );
+
+        handle.join().expect("Correctly terminate the operation.");
+
+        elapsed
     });
 
     let count = processed.load(Ordering::Relaxed);
     let skipped = skipped.load(Ordering::Relaxed);
+    let errors = p.errors.load(Relaxed);
 
-    let summary = TraverseSummary {
-        count,
-        duration,
-        errors,
-        traverse: execution.traversal_mode(),
-    };
-    reporter.report_summary(summary);
-    // if execution.should_report_to_terminal() {
-    // match execution.traversal_mode() {
-    //
-    //
-    //     TraversalMode::Check { .. } | TraversalMode::Lint { .. } => {
-    //         if execution.as_fix_file_mode().is_some() {
-    //             console.log(markup! {
-    //                 <Info>"Fixed "{count}" file(s) in "{duration}</Info>
-    //             });
-    //         } else {
-    //             console.log(markup!({
-    //                 CheckResult {
-    //                     count,
-    //                     duration,
-    //                     errors,
-    //                 }
-    //             }));
-    //         }
-    //     }
-    //     TraversalMode::CI { .. } => {
-    //         console.log(markup!({
-    //             CheckResult {
-    //                 count,
-    //                 duration,
-    //                 errors,
-    //             }
-    //         }));
-    //     }
-    //     TraversalMode::Format { write: false, .. } => {
-    //         console.log(markup! {
-    //             <Info>"Compared "{count}" file(s) in "{duration}</Info>
-    //         });
-    //     }
-    //     TraversalMode::Format { write: true, .. } => {
-    //         console.log(markup! {
-    //             <Info>"Formatted "{count}" file(s) in "{duration}</Info>
-    //         });
-    //     }
-    //
-    //     TraversalMode::Migrate { write: false, .. } => {
-    //         console.log(markup! {
-    //             <Info>"Checked your configuration file in "{duration}</Info>
-    //         });
-    //     }
-    //
-    //     TraversalMode::Migrate { write: true, .. } => {
-    //         console.log(markup! {
-    //             <Info>"Migrated your configuration file in "{duration}</Info>
-    //         });
-    //     }
-    // }
-    // } else {
-    //     if let TraversalMode::Format { write, .. } = execution.traversal_mode() {
-    //         let mut summary = FormatterReportSummary::default();
-    //         if *write {
-    //             summary.set_files_written(count);
-    //         } else {
-    //             summary.set_files_compared(count);
-    //         }
-    //         reporter.set_formatter_summary(summary);
-    //     }
-    //
-    //     let to_print = reporter.as_serialized_reports()?;
-    //     console.log(markup! {
-    //         {to_print}
-    //     });
-    //     return Ok(());
-    // }
+    let dumper = reporter
+        .finish(execution)
+        .with_duration(duration)
+        .with_skipped(skipped)
+        .with_count(count)
+        .with_errors(errors)
+        .with_warnings(warnings);
 
-    if skipped > 0 {
-        console.log(markup! {
-            <Warn>"Skipped "{skipped}" file(s)"</Warn>
-        });
-    }
-
-    let should_exit_on_warnings = warnings > 0 && cli_options.error_on_warnings;
-    // Processing emitted error diagnostics, exit with a non-zero code
-    if count.saturating_sub(skipped) == 0 && !cli_options.no_errors_on_unmatched {
-        Err(CliDiagnostic::no_files_processed())
-    } else if errors > 0 || should_exit_on_warnings {
-        let category = execution.as_diagnostic_category();
-        if should_exit_on_warnings {
-            if execution.is_check_apply() {
-                Err(CliDiagnostic::apply_warnings(category))
-            } else {
-                Err(CliDiagnostic::check_warnings(category))
-            }
-        } else if execution.is_check_apply() {
-            Err(CliDiagnostic::apply_error(category))
-        } else {
-            Err(CliDiagnostic::check_error(category))
-        }
-    } else {
-        Ok(())
-    }
+    dumper.dump(cli_options, session.app.console)
 }
 
 /// This function will setup the global Rayon thread pool the first time it's called
@@ -261,8 +148,6 @@ fn traverse_inputs(fs: &dyn FileSystem, inputs: Vec<OsString>, ctx: &TraversalOp
 struct ProcessMessagesOptions<'ctx> {
     ///  Execution of the traversal
     execution: &'ctx Execution,
-    /// Mutable reference to the [console](Console)
-    console: &'ctx mut dyn Console,
     /// Receiver channel for reporting statistics
     // recv_reports: Receiver<ReportKind>,
     /// Receiver channel that expects info when a file is processed
@@ -276,229 +161,176 @@ struct ProcessMessagesOptions<'ctx> {
     remaining_diagnostics: &'ctx AtomicU16,
     /// Mutable reference to a boolean flag tracking whether the console thread
     /// printed any error-level message
-    errors: &'ctx mut usize,
+    errors: &'ctx AtomicUsize,
     /// Mutable reference to a boolean flag tracking whether the console thread
     /// printed any warnings-level message
     warnings: &'ctx mut usize,
     /// Mutable handle to a [Report] instance the console thread should write
     /// stats into
-    reporter: &'ctx mut Reporter,
-    /// Whether the console thread should print diagnostics in verbose mode
-    verbose: bool,
+    report: &'ctx mut dyn Reporter,
 }
+impl<'ctx> ProcessMessagesOptions<'ctx> {
+    /// This thread receives [Message]s from the workers through the `recv_msgs`
+    /// and `recv_files` channels and handles them based on [Execution]
+    fn process_messages(&mut self) {
+        let mut paths: FxHashSet<String> = FxHashSet::default();
+        let mut printed_diagnostics: u16 = 0;
+        let mut not_printed_diagnostics = 0;
+        let mut total_skipped_suggested_fixes = 0;
 
-/// This thread receives [Message]s from the workers through the `recv_msgs`
-/// and `recv_files` channels and handles them based on [Execution]
-fn process_messages(options: ProcessMessagesOptions) {
-    let ProcessMessagesOptions {
-        execution: mode,
-        console,
-        // recv_reports,
-        recv_files,
-        recv_msgs,
-        max_diagnostics,
-        remaining_diagnostics,
-        errors,
-        reporter: report,
-        verbose,
-        warnings,
-    } = options;
-
-    let mut paths: FxHashSet<String> = FxHashSet::default();
-    let mut printed_diagnostics: u16 = 0;
-    let mut not_printed_diagnostics = 0;
-    let mut total_skipped_suggested_fixes = 0;
-
-    let mut is_msg_open = true;
-    let mut is_report_open = true;
-    let mut diagnostics_to_print = vec![];
-    while is_msg_open || is_report_open {
-        let msg = select! {
-            recv(recv_msgs) -> msg => match msg {
+        let mut is_msg_open = true;
+        while is_msg_open {
+            let msg = match self.recv_msgs.recv() {
                 Ok(msg) => msg,
                 Err(_) => {
                     is_msg_open = false;
                     continue;
-                },
-            },
-            // recv(recv_reports) -> stat => {
-            //     match stat {
-            //         Ok(stat) => {
-            //             report.push_detail_report(stat);
-            //         }
-            //         Err(_) => {
-            //             is_report_open = false;
-            //         },
-            //     }
-            //     continue;
-            // }
-        };
-
-        match msg {
-            Message::SkippedFixes {
-                skipped_suggested_fixes,
-            } => {
-                total_skipped_suggested_fixes += skipped_suggested_fixes;
-            }
-
-            Message::ApplyError(error) => {
-                *errors += 1;
-                let should_print = printed_diagnostics < max_diagnostics;
-                if should_print {
-                    printed_diagnostics += 1;
-                    remaining_diagnostics.store(
-                        max_diagnostics.saturating_sub(printed_diagnostics),
-                        Ordering::Relaxed,
-                    );
-                } else {
-                    not_printed_diagnostics += 1;
                 }
-                if mode.should_report_to_terminal() && should_print {
-                    diagnostics_to_print.push(Error::from(error));
-                }
-            }
+            };
 
-            Message::Error(mut err) => {
-                let location = err.location();
-                if err.severity() == Severity::Warning {
-                    *warnings += 1;
-                }
-                if let Some(Resource::File(file_path)) = location.resource.as_ref() {
-                    // Retrieves the file name from the file ID cache, if it's a miss
-                    // flush entries from the interner channel until it's found
-                    let file_name = match paths.get(*file_path) {
-                        Some(path) => Some(path),
-                        None => loop {
-                            match recv_files.recv() {
-                                Ok(path) => {
-                                    paths.insert(path.display().to_string());
-                                    if path.display().to_string() == *file_path {
-                                        break paths.get(&path.display().to_string());
-                                    }
-                                }
-                                // In case the channel disconnected without sending
-                                // the path we need, print the error without a file
-                                // name (normally this should never happen)
-                                Err(_) => break None,
-                            }
-                        },
-                    };
-
-                    if let Some(path) = file_name {
-                        err = err.with_file_path(path.as_str());
-                    }
+            match msg {
+                Message::SkippedFixes {
+                    skipped_suggested_fixes,
+                } => {
+                    total_skipped_suggested_fixes += skipped_suggested_fixes;
                 }
 
-                let should_print = printed_diagnostics < max_diagnostics;
-                if should_print {
-                    printed_diagnostics += 1;
-                    remaining_diagnostics.store(
-                        max_diagnostics.saturating_sub(printed_diagnostics),
-                        Ordering::Relaxed,
-                    );
-                } else {
-                    not_printed_diagnostics += 1;
-                }
+                Message::ApplyError(error) => {
+                    self.errors.fetch_add(1, Ordering::Relaxed);
 
-                if mode.should_report_to_terminal() {
+                    let should_print = printed_diagnostics < self.max_diagnostics;
                     if should_print {
-                        diagnostics_to_print.push(err);
+                        printed_diagnostics += 1;
+                        self.remaining_diagnostics.store(
+                            self.max_diagnostics.saturating_sub(printed_diagnostics),
+                            Ordering::Relaxed,
+                        );
+                    } else {
+                        not_printed_diagnostics += 1;
                     }
-                } else {
+                    if should_print {
+                        self.report.report_diagnostic(Error::from(error));
+                    }
+                }
+
+                Message::Error(mut err) => {
                     let location = err.location();
-                    let path = match &location.resource {
-                        Some(Resource::File(file)) => Some(*file),
-                        _ => None,
-                    };
-
-                    let file_name = path.unwrap_or("<unknown>");
-                    let title = PrintDescription(&err).to_string();
-                    // let code = err.category().and_then(|code| code.name().parse().ok());
-
-                    report.report_diagnostic(file_name.to_string(), err);
-                    // report.push_detail_report(ReportKind::Error(
-                    //     file_name.to_string(),
-                    //     ReportErrorKind::Diagnostic(ReportDiagnostic {
-                    //         code,
-                    //         title,
-                    //         severity: err.severity(),
-                    //     }),
-                    // ));
-                }
-            }
-
-            Message::Diagnostics {
-                name,
-                content,
-                diagnostics,
-                skipped_diagnostics,
-            } => {
-                not_printed_diagnostics += skipped_diagnostics;
-
-                // is CI mode we want to print all the diagnostics
-                if mode.is_ci() {
-                    for diag in diagnostics {
-                        let severity = diag.severity();
-                        if severity == Severity::Error {
-                            *errors += 1;
-                        }
-                        if severity == Severity::Warning {
-                            *warnings += 1;
-                        }
-
-                        let diag = diag.with_file_path(&name).with_file_source_code(&content);
-                        diagnostics_to_print.push(diag);
+                    if err.severity() == Severity::Warning {
+                        *self.warnings += 1;
                     }
-                } else {
-                    for diag in diagnostics {
-                        let severity = diag.severity();
-                        if severity == Severity::Error {
-                            *errors += 1;
-                        }
-                        if severity == Severity::Warning {
-                            *warnings += 1;
-                        }
+                    if let Some(Resource::File(file_path)) = location.resource.as_ref() {
+                        // Retrieves the file name from the file ID cache, if it's a miss
+                        // flush entries from the interner channel until it's found
+                        let file_name = match paths.get(*file_path) {
+                            Some(path) => Some(path),
+                            None => loop {
+                                match self.recv_files.recv() {
+                                    Ok(path) => {
+                                        paths.insert(path.display().to_string());
+                                        if path.display().to_string() == *file_path {
+                                            break paths.get(&path.display().to_string());
+                                        }
+                                    }
+                                    // In case the channel disconnected without sending
+                                    // the path we need, print the error without a file
+                                    // name (normally this should never happen)
+                                    Err(_) => break None,
+                                }
+                            },
+                        };
 
-                        let should_print = printed_diagnostics < max_diagnostics;
-                        if should_print {
-                            printed_diagnostics += 1;
-                            remaining_diagnostics.store(
-                                max_diagnostics.saturating_sub(printed_diagnostics),
-                                Ordering::Relaxed,
-                            );
-                        } else {
-                            not_printed_diagnostics += 1;
+                        if let Some(path) = file_name {
+                            err = err.with_file_path(path.as_str());
                         }
-
-                        diagnostics_to_print.push(diag)
                     }
-                }
-            }
-            Message::Diff {
-                file_name,
-                old,
-                new,
-                diff_kind,
-            } => {
-                // A diff is an error in CI mode and in format check mode
-                if mode.is_ci() || !mode.is_format_write() {
-                    *errors += 1;
-                }
 
-                let should_print = printed_diagnostics < max_diagnostics;
-                if should_print {
-                    printed_diagnostics += 1;
-                    remaining_diagnostics.store(
-                        max_diagnostics.saturating_sub(printed_diagnostics),
-                        Ordering::Relaxed,
-                    );
-                } else {
-                    not_printed_diagnostics += 1;
-                }
-
-                if mode.should_report_to_terminal() {
+                    let should_print = printed_diagnostics < self.max_diagnostics;
                     if should_print {
-                        if mode.is_ci() {
+                        printed_diagnostics += 1;
+                        self.remaining_diagnostics.store(
+                            self.max_diagnostics.saturating_sub(printed_diagnostics),
+                            Ordering::Relaxed,
+                        );
+                    } else {
+                        not_printed_diagnostics += 1;
+                    }
+
+                    if should_print {
+                        self.report.report_diagnostic(Error::from(err));
+                    }
+                }
+
+                Message::Diagnostics {
+                    name,
+                    content,
+                    diagnostics,
+                    skipped_diagnostics,
+                } => {
+                    not_printed_diagnostics += skipped_diagnostics;
+
+                    // is CI mode we want to print all the diagnostics
+                    if self.execution.is_ci() {
+                        for diag in diagnostics {
+                            let severity = diag.severity();
+                            if severity == Severity::Error {
+                                self.errors.fetch_add(1, Ordering::Relaxed);
+                            }
+                            if severity == Severity::Warning {
+                                *self.warnings += 1;
+                            }
+
+                            let diag = diag.with_file_path(&name).with_file_source_code(&content);
+                            self.report.report_diagnostic(Error::from(diag));
+                        }
+                    } else {
+                        for diag in diagnostics {
+                            let severity = diag.severity();
+                            if severity == Severity::Error {
+                                self.errors.fetch_add(1, Ordering::Relaxed);
+                            }
+                            if severity == Severity::Warning {
+                                *self.warnings += 1;
+                            }
+
+                            let should_print = printed_diagnostics < self.max_diagnostics;
+                            if should_print {
+                                printed_diagnostics += 1;
+                                self.remaining_diagnostics.store(
+                                    self.max_diagnostics.saturating_sub(printed_diagnostics),
+                                    Ordering::Relaxed,
+                                );
+                            } else {
+                                not_printed_diagnostics += 1;
+                            }
+                            let diag = diag.with_file_path(&name).with_file_source_code(&content);
+                            self.report.report_diagnostic(Error::from(diag));
+                        }
+                    }
+                }
+                Message::Diff {
+                    file_name,
+                    old,
+                    new,
+                    diff_kind,
+                } => {
+                    // A diff is an error in CI mode and in format check mode
+                    if self.execution.is_ci() || !self.execution.is_format_write() {
+                        self.errors.fetch_add(1, Ordering::Relaxed);
+                    }
+
+                    let should_print = printed_diagnostics < self.max_diagnostics;
+                    if should_print {
+                        printed_diagnostics += 1;
+                        self.remaining_diagnostics.store(
+                            self.max_diagnostics.saturating_sub(printed_diagnostics),
+                            Ordering::Relaxed,
+                        );
+                    } else {
+                        not_printed_diagnostics += 1;
+                    }
+
+                    if should_print {
+                        if self.execution.is_ci() {
                             match diff_kind {
                                 DiffKind::Format => {
                                     let diag = CIFormatDiffDiagnostic {
@@ -508,7 +340,8 @@ fn process_messages(options: ProcessMessagesOptions) {
                                             new: new.clone(),
                                         },
                                     };
-                                    diagnostics_to_print.push(Error::from(diag))
+                                    self.report.report_diagnostic(Error::from(diag));
+                                    // diagnostics_to_print.push(Error::from(diag))
                                 }
                                 DiffKind::OrganizeImports => {
                                     let diag = CIOrganizeImportsDiffDiagnostic {
@@ -518,7 +351,7 @@ fn process_messages(options: ProcessMessagesOptions) {
                                             new: new.clone(),
                                         },
                                     };
-                                    diagnostics_to_print.push(Error::from(diag))
+                                    self.report.report_diagnostic(Error::from(diag));
                                 }
                             };
                         } else {
@@ -531,7 +364,8 @@ fn process_messages(options: ProcessMessagesOptions) {
                                             new: new.clone(),
                                         },
                                     };
-                                    diagnostics_to_print.push(Error::from(diag))
+                                    self.report.report_diagnostic(Error::from(diag));
+                                    // diagnostics_to_print.push(Error::from(diag))
                                 }
                                 DiffKind::OrganizeImports => {
                                     let diag = OrganizeImportsDiffDiagnostic {
@@ -541,43 +375,19 @@ fn process_messages(options: ProcessMessagesOptions) {
                                             new: new.clone(),
                                         },
                                     };
-                                    diagnostics_to_print.push(Error::from(diag))
+                                    self.report.report_diagnostic(Error::from(diag));
                                 }
                             };
                         }
                     }
-                } else {
-                    // report.push_detail_report(ReportKind::Error(
-                    //     file_name,
-                    //     ReportErrorKind::Diff(ReportDiff {
-                    //         before: old,
-                    //         after: new,
-                    //         severity: Severity::Error,
-                    //     }),
-                    // ));
                 }
             }
         }
-    }
 
-    for diagnostic in diagnostics_to_print {
-        console.error(markup! {
-            {if verbose { PrintDiagnostic::verbose(&diagnostic) } else { PrintDiagnostic::simple(&diagnostic) }}
-        });
-    }
-
-    if mode.is_check() && total_skipped_suggested_fixes > 0 {
-        console.log(markup! {
-            <Warn>"Skipped "{total_skipped_suggested_fixes}" suggested fixes.\n"</Warn>
-            <Info>"If you wish to apply the suggested (unsafe) fixes, use the command "<Emphasis>"biome check --apply-unsafe\n"</Emphasis></Info>
-        })
-    }
-
-    if !mode.is_ci() && not_printed_diagnostics > 0 {
-        console.log(markup! {
-            <Warn>"The number of diagnostics exceeds the number allowed by Biome.\n"</Warn>
-            <Info>"Diagnostics not shown: "</Info><Emphasis>{not_printed_diagnostics}</Emphasis><Info>"."</Info>
-        })
+        self.report
+            .report_not_printed_diagnostics(not_printed_diagnostics);
+        self.report
+            .report_skipped_fixes(total_skipped_suggested_fixes);
     }
 }
 
@@ -595,6 +405,7 @@ pub(crate) struct TraversalOptions<'ctx, 'app> {
     processed: &'ctx AtomicUsize,
     /// Shared atomic counter storing the number of skipped files
     skipped: &'ctx AtomicUsize,
+    errors: &'ctx AtomicUsize,
     /// Channel sending messages to the display thread
     pub(crate) messages: Sender<Message>,
     /// Channel sending reports to the reports thread
@@ -607,6 +418,9 @@ pub(crate) struct TraversalOptions<'ctx, 'app> {
 impl<'ctx, 'app> TraversalOptions<'ctx, 'app> {
     pub(crate) fn increment_processed(&self) {
         self.processed.fetch_add(1, Ordering::Relaxed);
+    }
+    pub(crate) fn increment_errors(&self) {
+        self.errors.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Send a message to the display thread

@@ -16,10 +16,11 @@ use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::sync::RwLock;
 
+#[derive(Debug)]
 /// Useful information during the traversal of files and virtual content
-pub(crate) struct Execution {
+pub struct Execution {
     /// How the information should be collected and reported
-    report_mode: ReportMode,
+    // report_mode: ReportMode,
 
     /// The modality of execution of the traversal
     traversal_mode: TraversalMode,
@@ -98,7 +99,7 @@ impl Display for TraversalMode {
 
 /// Tells to the execution of the traversal how the information should be reported
 #[derive(Copy, Clone, Default)]
-pub(crate) enum ReportMode {
+pub enum ReportMode {
     /// Reports information straight to the console, it's the default mode
     #[default]
     Terminal,
@@ -109,7 +110,7 @@ pub(crate) enum ReportMode {
 impl Execution {
     pub(crate) fn new(mode: TraversalMode) -> Self {
         Self {
-            report_mode: ReportMode::default(),
+            // report_mode: ReportMode::default(),
             traversal_mode: mode,
             max_diagnostics: MAXIMUM_DISPLAYABLE_DIAGNOSTICS,
         }
@@ -119,15 +120,15 @@ impl Execution {
     pub(crate) fn with_report(traversal_mode: TraversalMode, report_mode: ReportMode) -> Self {
         Self {
             traversal_mode,
-            report_mode,
+            // report_mode,
             max_diagnostics: MAXIMUM_DISPLAYABLE_DIAGNOSTICS,
         }
     }
 
     /// Tells if the reporting is happening straight to terminal
-    pub(crate) fn should_report_to_terminal(&self) -> bool {
-        matches!(self.report_mode, ReportMode::Terminal)
-    }
+    // pub(crate) fn should_report_to_terminal(&self) -> bool {
+    //     matches!(self.report_mode, ReportMode::Terminal)
+    // }
 
     pub(crate) fn traversal_mode(&self) -> &TraversalMode {
         &self.traversal_mode
@@ -258,7 +259,7 @@ pub(crate) fn execute_mode(
             cli_options.verbose,
         )
     } else {
-        let reporter = ConsoleReporter::new(true, cli_options.verbose);
+        let reporter = ConsoleReporter::new(cli_options.verbose, ReportMode::Terminal);
         traverse(mode, session, cli_options, paths, reporter)
     }
 }

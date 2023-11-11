@@ -33,6 +33,7 @@ pub use crate::logging::{setup_cli_subscriber, LoggingLevel};
 pub use diagnostics::CliDiagnostic;
 pub(crate) use execute::{execute_mode, Execution, TraversalMode};
 pub use panic::setup_panic_handler;
+pub use reporter::Reporter;
 pub use service::{open_transport, SocketTransport};
 
 pub(crate) const VERSION: &str = match option_env!("BIOME_VERSION") {
