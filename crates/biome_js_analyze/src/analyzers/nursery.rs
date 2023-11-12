@@ -2,6 +2,7 @@
 
 use biome_analyze::declare_group;
 
+pub(crate) mod enforce_foo_bar;
 pub(crate) mod no_approximative_numeric_constant;
 pub(crate) mod no_empty_block_statements;
 pub(crate) mod no_empty_character_class_in_regex;
@@ -20,6 +21,7 @@ declare_group! {
     pub (crate) Nursery {
         name : "nursery" ,
         rules : [
+            self :: enforce_foo_bar :: EnforceFooBar ,
             self :: no_approximative_numeric_constant :: NoApproximativeNumericConstant ,
             self :: no_empty_block_statements :: NoEmptyBlockStatements ,
             self :: no_empty_character_class_in_regex :: NoEmptyCharacterClassInRegex ,

@@ -1030,6 +1030,13 @@
 					"description": "It enables ALL rules for this group.",
 					"type": ["boolean", "null"]
 				},
+				"enforceFooBar": {
+					"description": "Succinct description of the rule.",
+					"anyOf": [
+						{ "$ref": "#/definitions/RuleConfiguration" },
+						{ "type": "null" }
+					]
+				},
 				"noApproximativeNumericConstant": {
 					"description": "Usually, the definition in the standard library is more precise than what people come up with or the used constant exceeds the maximum precision of the number type.",
 					"anyOf": [

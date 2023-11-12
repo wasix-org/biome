@@ -733,6 +733,10 @@ export interface Nursery {
 	 */
 	all?: boolean;
 	/**
+	 * Succinct description of the rule.
+	 */
+	enforceFooBar?: RuleConfiguration;
+	/**
 	 * Usually, the definition in the standard library is more precise than what people come up with or the used constant exceeds the maximum precision of the number type.
 	 */
 	noApproximativeNumericConstant?: RuleConfiguration;
@@ -1436,6 +1440,7 @@ export type Category =
 	| "lint/correctness/useIsNan"
 	| "lint/correctness/useValidForDirection"
 	| "lint/correctness/useYield"
+	| "lint/nursery/enforceFooBar"
 	| "lint/nursery/noApproximativeNumericConstant"
 	| "lint/nursery/noDuplicateJsonKeys"
 	| "lint/nursery/noEmptyBlockStatements"

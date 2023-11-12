@@ -774,6 +774,11 @@ impl VisitNode<JsonLanguage> for Nursery {
             "all" => {
                 self.all = Some(self.map_to_boolean(&value, name_text, diagnostics)?);
             }
+            "enforceFooBar" => {
+                let mut configuration = RuleConfiguration::default();
+                configuration.map_rule_configuration(&value, "enforceFooBar", diagnostics)?;
+                self.enforce_foo_bar = Some(configuration);
+            }
             "noApproximativeNumericConstant" => {
                 let mut configuration = RuleConfiguration::default();
                 configuration.map_rule_configuration(
@@ -919,6 +924,7 @@ impl VisitNode<JsonLanguage> for Nursery {
                     &[
                         "recommended",
                         "all",
+                        "enforceFooBar",
                         "noApproximativeNumericConstant",
                         "noDuplicateJsonKeys",
                         "noEmptyBlockStatements",

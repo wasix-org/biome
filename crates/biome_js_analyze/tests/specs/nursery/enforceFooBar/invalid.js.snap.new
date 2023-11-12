@@ -1,0 +1,29 @@
+---
+source: crates/biome_js_analyze/tests/spec_tests.rs
+assertion_line: 83
+expression: invalid.js
+---
+# Input
+```js
+const foo = "foo123";
+const foo = "bar";
+
+```
+
+# Diagnostics
+```
+invalid.js:1:7 lint/nursery/enforceFooBar ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ! Variable is read here.
+  
+  > 1 │ const foo = "foo123";
+      │       ^^^^^^^^^^^^^^
+    2 │ const foo = "bar";
+    3 │ 
+  
+  i This note will give you more information.
+  
+
+```
+
+
