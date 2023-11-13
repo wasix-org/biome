@@ -2730,6 +2730,10 @@ pub struct Nursery {
     #[bpaf(long("use-await"), argument("on|off|warn"), optional, hide)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub use_await: Option<RuleConfiguration>,
+    #[doc = "Promotes the use of export type for type-only types."]
+    #[bpaf(long("use-export-type"), argument("on|off|warn"), optional, hide)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_export_type: Option<RuleConfiguration>,
     #[doc = "Enforce the use of import type when an import only has specifiers with type qualifier."]
     #[bpaf(
         long("use-grouped-type-import"),
@@ -2829,6 +2833,9 @@ impl MergeWith<Nursery> for Nursery {
         if let Some(use_await) = other.use_await {
             self.use_await = Some(use_await);
         }
+        if let Some(use_export_type) = other.use_export_type {
+            self.use_export_type = Some(use_export_type);
+        }
         if let Some(use_grouped_type_import) = other.use_grouped_type_import {
             self.use_grouped_type_import = Some(use_grouped_type_import);
         }
@@ -2856,7 +2863,7 @@ impl MergeWith<Nursery> for Nursery {
 }
 impl Nursery {
     const GROUP_NAME: &'static str = "nursery";
-    pub(crate) const GROUP_RULES: [&'static str; 25] = [
+    pub(crate) const GROUP_RULES: [&'static str; 26] = [
         "noApproximativeNumericConstant",
         "noAriaHiddenOnFocusable",
         "noDefaultExport",
@@ -2877,13 +2884,14 @@ impl Nursery {
         "useArrowFunction",
         "useAsConstAssertion",
         "useAwait",
+        "useExportType",
         "useGroupedTypeImport",
         "useImportRestrictions",
         "useRegexLiterals",
         "useShorthandAssign",
         "useValidAriaRole",
     ];
-    const RECOMMENDED_RULES: [&'static str; 12] = [
+    const RECOMMENDED_RULES: [&'static str; 13] = [
         "noAriaHiddenOnFocusable",
         "noDuplicateJsonKeys",
         "noEmptyCharacterClassInRegex",
@@ -2894,10 +2902,11 @@ impl Nursery {
         "useArrowFunction",
         "useAsConstAssertion",
         "useAwait",
+        "useExportType",
         "useGroupedTypeImport",
         "useValidAriaRole",
     ];
-    const RECOMMENDED_RULES_AS_FILTERS: [RuleFilter<'static>; 12] = [
+    const RECOMMENDED_RULES_AS_FILTERS: [RuleFilter<'static>; 13] = [
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[1]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[3]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[5]),
@@ -2909,9 +2918,10 @@ impl Nursery {
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[18]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[19]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[20]),
-        RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[24]),
+        RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[21]),
+        RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[25]),
     ];
-    const ALL_RULES_AS_FILTERS: [RuleFilter<'static>; 25] = [
+    const ALL_RULES_AS_FILTERS: [RuleFilter<'static>; 26] = [
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[0]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[1]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[2]),
@@ -2937,6 +2947,7 @@ impl Nursery {
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[22]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[23]),
         RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[24]),
+        RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[25]),
     ];
     #[doc = r" Retrieves the recommended rules"]
     pub(crate) fn is_recommended(&self) -> bool {
@@ -3053,29 +3064,34 @@ impl Nursery {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[19]));
             }
         }
-        if let Some(rule) = self.use_grouped_type_import.as_ref() {
+        if let Some(rule) = self.use_export_type.as_ref() {
             if rule.is_enabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[20]));
             }
         }
-        if let Some(rule) = self.use_import_restrictions.as_ref() {
+        if let Some(rule) = self.use_grouped_type_import.as_ref() {
             if rule.is_enabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[21]));
             }
         }
-        if let Some(rule) = self.use_regex_literals.as_ref() {
+        if let Some(rule) = self.use_import_restrictions.as_ref() {
             if rule.is_enabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[22]));
             }
         }
-        if let Some(rule) = self.use_shorthand_assign.as_ref() {
+        if let Some(rule) = self.use_regex_literals.as_ref() {
             if rule.is_enabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[23]));
             }
         }
-        if let Some(rule) = self.use_valid_aria_role.as_ref() {
+        if let Some(rule) = self.use_shorthand_assign.as_ref() {
             if rule.is_enabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[24]));
+            }
+        }
+        if let Some(rule) = self.use_valid_aria_role.as_ref() {
+            if rule.is_enabled() {
+                index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[25]));
             }
         }
         index_set
@@ -3182,29 +3198,34 @@ impl Nursery {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[19]));
             }
         }
-        if let Some(rule) = self.use_grouped_type_import.as_ref() {
+        if let Some(rule) = self.use_export_type.as_ref() {
             if rule.is_disabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[20]));
             }
         }
-        if let Some(rule) = self.use_import_restrictions.as_ref() {
+        if let Some(rule) = self.use_grouped_type_import.as_ref() {
             if rule.is_disabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[21]));
             }
         }
-        if let Some(rule) = self.use_regex_literals.as_ref() {
+        if let Some(rule) = self.use_import_restrictions.as_ref() {
             if rule.is_disabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[22]));
             }
         }
-        if let Some(rule) = self.use_shorthand_assign.as_ref() {
+        if let Some(rule) = self.use_regex_literals.as_ref() {
             if rule.is_disabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[23]));
             }
         }
-        if let Some(rule) = self.use_valid_aria_role.as_ref() {
+        if let Some(rule) = self.use_shorthand_assign.as_ref() {
             if rule.is_disabled() {
                 index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[24]));
+            }
+        }
+        if let Some(rule) = self.use_valid_aria_role.as_ref() {
+            if rule.is_disabled() {
+                index_set.insert(RuleFilter::Rule(Self::GROUP_NAME, Self::GROUP_RULES[25]));
             }
         }
         index_set
@@ -3217,10 +3238,10 @@ impl Nursery {
     pub(crate) fn is_recommended_rule(rule_name: &str) -> bool {
         Self::RECOMMENDED_RULES.contains(&rule_name)
     }
-    pub(crate) fn recommended_rules_as_filters() -> [RuleFilter<'static>; 12] {
+    pub(crate) fn recommended_rules_as_filters() -> [RuleFilter<'static>; 13] {
         Self::RECOMMENDED_RULES_AS_FILTERS
     }
-    pub(crate) fn all_rules_as_filters() -> [RuleFilter<'static>; 25] {
+    pub(crate) fn all_rules_as_filters() -> [RuleFilter<'static>; 26] {
         Self::ALL_RULES_AS_FILTERS
     }
     #[doc = r" Select preset rules"]
@@ -3267,6 +3288,7 @@ impl Nursery {
             "useArrowFunction" => self.use_arrow_function.as_ref(),
             "useAsConstAssertion" => self.use_as_const_assertion.as_ref(),
             "useAwait" => self.use_await.as_ref(),
+            "useExportType" => self.use_export_type.as_ref(),
             "useGroupedTypeImport" => self.use_grouped_type_import.as_ref(),
             "useImportRestrictions" => self.use_import_restrictions.as_ref(),
             "useRegexLiterals" => self.use_regex_literals.as_ref(),

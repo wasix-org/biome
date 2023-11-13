@@ -985,6 +985,10 @@ impl Deserializable for Nursery {
                             result.use_await =
                                 Deserializable::deserialize(&value, "useAwait", diagnostics);
                         }
+                        "useExportType" => {
+                            result.use_export_type =
+                                Deserializable::deserialize(&value, "useExportType", diagnostics);
+                        }
                         "useGroupedTypeImport" => {
                             result.use_grouped_type_import = Deserializable::deserialize(
                                 &value,
@@ -1047,6 +1051,7 @@ impl Deserializable for Nursery {
                                     "useArrowFunction",
                                     "useAsConstAssertion",
                                     "useAwait",
+                                    "useExportType",
                                     "useGroupedTypeImport",
                                     "useImportRestrictions",
                                     "useRegexLiterals",
